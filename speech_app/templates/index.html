@@ -1,0 +1,75 @@
+<!-- speech_app/templates/index.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Real-time Speech to Text</title>
+</head>
+<body>
+    <h2>Real-time Speech to Text</h2>
+    <button id="startButton">Start Recognition</button>
+    <button id="stopButton" style="display: none;">Stop Recognition</button>
+    <div id="result"></div>
+
+    <script>
+        var socket = new WebSocket('ws://' + window.location.host + '/ws/speech-to-text/');
+        var recognition;
+
+        document.getElementById('startButton').onclick = function () {
+            startRecognition();
+        };
+
+        document.getElementById('stopButton').onclick = function () {
+            stopRecognition();
+        };
+
+        function startRecognition() {
+            recognition = new webkitSpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+
+            recognition.onresult = function (event) {
+                var resultDiv = document.getElementById('result');
+                var transcript = event.results[0][0].transcript;
+                resultDiv.innerHTML = 'Real-time Text: ' + transcript;
+
+                // Send the audio data to the server
+                socket.send(JSON.stringify({ audio_data: event.results[0][0].blob }));
+            };
+
+            recognition.onerror = function (event) {
+                console.error('Recognition error:', event.error);
+            };
+
+            recognition.onend = function () {
+                console.log('Recognition ended');
+            };
+
+            recognition.start();
+
+            document.getElementById('startButton').style.display = 'none';
+            document.getElementById('stopButton').style.display = 'inline';
+        }
+
+        function stopRecognition() {
+            if (recognition) {
+                recognition.stop();
+                recognition = null;
+
+                document.getElementById('startButton').style.display = 'inline';
+                document.getElementById('stopButton').style.display = 'none';
+            }
+        }
+
+        socket.onmessage = function (event) {
+            var resultDiv = document.getElementById('result');
+            var data = JSON.parse(event.data);
+
+            if (data.text) {
+                resultDiv.innerHTML = 'Real-time Text: ' + data.text;
+            } else if (data.error) {
+                resultDiv.innerHTML = 'Error: ' + data.error;
+            }
+        };
+    </script>
+</body>
+</html>
